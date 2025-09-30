@@ -6,6 +6,7 @@ import os
 import wandb
 import hydra
 from omegaconf import DictConfig
+from hydra import utils as hydra_utils
 
 _steps = [
     "download",
@@ -16,7 +17,7 @@ _steps = [
     # NOTE: We do not include this in the steps so it is not run by mistake.
     # You first need to promote a model export to "prod" before you can run this,
     # then you need to run this step explicitly
-#    "test_regression_model"
+    # "test_regression_model"
 ]
 
 
@@ -31,6 +32,14 @@ def go(config: DictConfig):
     # Steps to execute
     steps_par = config['main']['steps']
     active_steps = steps_par.split(",") if steps_par != "all" else _steps
+
+    # Resolve absolute paths to local steps because Hydra changes the working dir
+    project_root = hydra_utils.get_original_cwd()
+    basic_cleaning_uri = os.path.join(project_root, "src", "basic_cleaning")
+    # (You’ll create similar URIs later for other local steps)
+    # data_check_uri = os.path.join(project_root, "src", "data_check")
+    # data_split_uri = os.path.join(project_root, "src", "data_split")
+    # train_rf_uri = os.path.join(project_root, "src", "train_random_forest")
 
     # Move to a temporary directory
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -51,10 +60,19 @@ def go(config: DictConfig):
             )
 
         if "basic_cleaning" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            _ = mlflow.run(
+                basic_cleaning_uri,                     # << use absolute path
+                entry_point="main",
+                env_manager="conda",
+                parameters={
+                    "input_artifact": "sample.csv:latest",
+                    "output_artifact": "clean_sample.csv",
+                    "output_type": "clean_sample",
+                    "output_description": "Price filtered (min/max) & last_review parsed",
+                    "min_price": config["etl"]["min_price"],
+                    "max_price": config["etl"]["max_price"],
+                },
+            )
 
         if "data_check" in active_steps:
             ##################
@@ -95,3 +113,4 @@ def go(config: DictConfig):
 
 if __name__ == "__main__":
     go()
+
