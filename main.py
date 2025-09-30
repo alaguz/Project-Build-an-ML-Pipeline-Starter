@@ -36,10 +36,9 @@ def go(config: DictConfig):
     # Resolve absolute paths to local steps because Hydra changes the working dir
     project_root = hydra_utils.get_original_cwd()
     basic_cleaning_uri = os.path.join(project_root, "src", "basic_cleaning")
-    # (You’ll create similar URIs later for other local steps)
-    # data_check_uri = os.path.join(project_root, "src", "data_check")
-    # data_split_uri = os.path.join(project_root, "src", "data_split")
-    # train_rf_uri = os.path.join(project_root, "src", "train_random_forest")
+    data_check_uri     = os.path.join(project_root, "src", "data_check")
+    # data_split_uri   = os.path.join(project_root, "src", "data_split")
+    # train_rf_uri     = os.path.join(project_root, "src", "train_random_forest")
 
     # Move to a temporary directory
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -61,7 +60,7 @@ def go(config: DictConfig):
 
         if "basic_cleaning" in active_steps:
             _ = mlflow.run(
-                basic_cleaning_uri,                     # << use absolute path
+                basic_cleaning_uri,                     # use absolute path
                 entry_point="main",
                 env_manager="conda",
                 parameters={
@@ -75,10 +74,18 @@ def go(config: DictConfig):
             )
 
         if "data_check" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            _ = mlflow.run(
+                data_check_uri,                         # use absolute path
+                entry_point="main",
+                env_manager="conda",
+                parameters={
+                    "csv": "clean_sample.csv:latest",
+                    "ref": "clean_sample.csv:reference",
+                    "kl_threshold": config["data_check"]["kl_threshold"],
+                    "min_price": config["etl"]["min_price"],
+                    "max_price": config["etl"]["max_price"],
+                },
+            )
 
         if "data_split" in active_steps:
             ##################
@@ -113,4 +120,3 @@ def go(config: DictConfig):
 
 if __name__ == "__main__":
     go()
-
