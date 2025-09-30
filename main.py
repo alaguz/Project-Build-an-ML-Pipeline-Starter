@@ -14,10 +14,8 @@ _steps = [
     "data_check",
     "data_split",
     "train_random_forest",
-    # NOTE: We do not include this in the steps so it is not run by mistake.
-    # You first need to promote a model export to "prod" before you can run this,
-    # then you need to run this step explicitly
-    # "test_regression_model"
+    # NOTE: We now include this, but remember: you need to explicitly run this step
+    "test_regression_model"
 ]
 
 
@@ -34,7 +32,7 @@ def go(config: DictConfig):
     active_steps = steps_par.split(",") if steps_par != "all" else _steps
 
     # Resolve absolute paths to local steps because Hydra changes the working dir
-    project_root      = hydra_utils.get_original_cwd()
+    project_root       = hydra_utils.get_original_cwd()
     basic_cleaning_uri = os.path.join(project_root, "src", "basic_cleaning")
     data_check_uri     = os.path.join(project_root, "src", "data_check")
     train_rf_uri       = os.path.join(project_root, "src", "train_random_forest")
@@ -107,7 +105,6 @@ def go(config: DictConfig):
             with open(rf_config, "w+") as fp:
                 json.dump(dict(config["modeling"]["random_forest"].items()), fp)  # DO NOT TOUCH
 
-            # Example implementation (you’ll refine after editing run.py)
             _ = mlflow.run(
                 train_rf_uri,
                 entry_point="main",
@@ -124,10 +121,16 @@ def go(config: DictConfig):
             )
 
         if "test_regression_model" in active_steps:
-            ##################
-            # Implement later #
-            ##################
-            pass
+            _ = mlflow.run(
+                f"{config['main']['components_repository']}/test_regression_model",
+                "main",
+                version="main",
+                env_manager="conda",
+                parameters={
+                    "mlflow_model": "random_forest_export:prod",
+                    "test_dataset": "test_data.csv:latest",   # ✅ fixed here
+                },
+            )
 
 
 if __name__ == "__main__":
