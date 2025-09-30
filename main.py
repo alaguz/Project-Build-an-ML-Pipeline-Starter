@@ -34,11 +34,10 @@ def go(config: DictConfig):
     active_steps = steps_par.split(",") if steps_par != "all" else _steps
 
     # Resolve absolute paths to local steps because Hydra changes the working dir
-    project_root = hydra_utils.get_original_cwd()
+    project_root      = hydra_utils.get_original_cwd()
     basic_cleaning_uri = os.path.join(project_root, "src", "basic_cleaning")
     data_check_uri     = os.path.join(project_root, "src", "data_check")
-    # data_split_uri   = os.path.join(project_root, "src", "data_split")
-    # train_rf_uri     = os.path.join(project_root, "src", "train_random_forest")
+    train_rf_uri       = os.path.join(project_root, "src", "train_random_forest")
 
     # Move to a temporary directory
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -88,10 +87,18 @@ def go(config: DictConfig):
             )
 
         if "data_split" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            _ = mlflow.run(
+                f"{config['main']['components_repository']}/train_val_test_split",
+                "main",
+                version="main",
+                env_manager="conda",
+                parameters={
+                    "input": "clean_sample.csv:latest",
+                    "test_size": str(config["modeling"]["test_size"]),
+                    "random_seed": str(config["modeling"]["random_seed"]),
+                    "stratify_by": config["modeling"]["stratify_by"],
+                },
+            )
 
         if "train_random_forest" in active_steps:
 
@@ -100,21 +107,26 @@ def go(config: DictConfig):
             with open(rf_config, "w+") as fp:
                 json.dump(dict(config["modeling"]["random_forest"].items()), fp)  # DO NOT TOUCH
 
-            # NOTE: use the rf_config we just created as the rf_config parameter for the train_random_forest
-            # step
-
-            ##################
-            # Implement here #
-            ##################
-
-            pass
+            # Example implementation (you’ll refine after editing run.py)
+            _ = mlflow.run(
+                train_rf_uri,
+                entry_point="main",
+                env_manager="conda",
+                parameters={
+                    "trainval_artifact": "trainval_data.csv:latest",
+                    "val_size": config["modeling"]["val_size"],
+                    "random_seed": config["modeling"]["random_seed"],
+                    "stratify_by": config["modeling"]["stratify_by"],
+                    "rf_config": rf_config,
+                    "max_tfidf_features": config["modeling"]["max_tfidf_features"],
+                    "output_artifact": "random_forest_export",
+                },
+            )
 
         if "test_regression_model" in active_steps:
-
             ##################
-            # Implement here #
+            # Implement later #
             ##################
-
             pass
 
 
